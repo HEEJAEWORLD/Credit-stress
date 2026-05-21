@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 신용 스트레스 대시보드 · 자동 갱신</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c10;--panel:#11151c;--panel2:#161b24;--line:#222a36;
+    --ink:#e6edf3;--dim:#8b97a8;--faint:#5a6675;
+    --green:#3fd68b;--amber:#f0b429;--orange:#ff8a3d;--red:#ff4d5e;--accent:#5ec8ff;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;--sans:'IBM Plex Sans KR',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 80% -10%,rgba(94,200,255,.06),transparent 60%),
+      radial-gradient(900px 500px at -10% 110%,rgba(255,77,94,.05),transparent 55%),var(--bg);
+    color:var(--ink);font-family:var(--sans);line-height:1.5;padding:26px 18px 60px;min-height:100vh}
+  .wrap{max-width:1080px;margin:0 auto}
+  header{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;
+    border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:20px}
+  h1{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:.4px}
+  h1 .tag{color:var(--accent)}
+  .sub{color:var(--faint);font-family:var(--mono);font-size:11px}
+  .sub b{color:var(--green)}
+  .gauge{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px 20px;margin-bottom:18px}
+  .gauge .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .gauge .k{font-family:var(--mono);font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim)}
+  .gauge .verdict{font-family:var(--mono);font-weight:700;font-size:15px;display:flex;align-items:center;gap:9px}
+  .gauge .verdict .em{font-size:26px;line-height:1}
+  .spectrum{position:relative;height:30px;border-radius:8px;
+    background:linear-gradient(90deg,var(--green) 0%,#9fd84f 28%,var(--amber) 52%,var(--orange) 74%,var(--red) 100%);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .marker{position:absolute;top:-9px;transform:translateX(-50%);transition:left .6s cubic-bezier(.3,.8,.3,1)}
+  .marker .needle{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;
+    border-top:13px solid #fff;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));margin:0 auto}
+  .marker .lbl{font-family:var(--mono);font-size:11px;font-weight:700;background:#fff;color:#06121c;padding:1px 6px;border-radius:5px;margin-top:30px;white-space:nowrap}
+  .ends{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mono);font-size:12px}
+  .ends .pe{color:var(--green)}.ends .sk{color:var(--red)}.ends .em{font-size:18px;vertical-align:-3px;margin:0 4px}
+  .mods{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:860px){.mods{grid-template-columns:1fr}}
+  .mod{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .mod .head{padding:15px 18px 13px;border-bottom:1px solid var(--line)}
+  .mod .title{font-family:var(--mono);font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mod .title span{color:var(--faint)}
+  .mod .desc{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:3px;line-height:1.5}
+  .dirtag{font-family:var(--mono);font-size:10.5px;font-weight:600;margin-top:9px;display:inline-flex;align-items:center;gap:6px;
+    padding:3px 9px;border-radius:6px;background:var(--panel2);border:1px solid var(--line)}
+  .dirtag .em{font-size:13px}
+  .mod .body{padding:16px 18px 18px}
+  .now{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .bignum{font-family:var(--mono);font-weight:700;font-size:42px;line-height:1;letter-spacing:-1px}
+  .bignum small{font-size:15px;color:var(--dim);font-weight:500}
+  .statuspill{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:999px;
+    border:1px solid currentColor;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 9px currentColor}
+  .sub2{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
+  .sub2 b{color:var(--ink);font-weight:600}
+  svg{width:100%;height:auto;display:block;margin-top:12px}
+  .gl{stroke:var(--line);stroke-width:1}.axt{fill:var(--faint);font-family:var(--mono);font-size:9px}
+  .ln{fill:none;stroke-width:2}.dt{fill:var(--bg);stroke-width:2}
+  details{margin-top:14px}summary{font-family:var(--mono);font-size:11px;color:var(--dim);cursor:pointer;letter-spacing:.5px}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;margin-top:10px}
+  th,td{padding:6px 7px;text-align:right;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:500;font-size:9px;letter-spacing:.6px;text-transform:uppercase}
+  th:first-child,td:first-child{text-align:left}
+  .hint{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:10px;line-height:1.55}
+  footer{margin-top:20px;font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.7;border-top:1px solid var(--line);padding-top:13px}
+  footer .em{font-size:13px;vertical-align:-2px}
+  .empty{padding:30px;text-align:center;color:var(--faint);font-family:var(--mono);font-size:12px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AI 신용 스트레스 대시보드 <span class="tag">· 상류 신용 ⨯ 말단 유동성</span></h1>
+    <span class="sub" id="updated">자동 갱신 · 월·수·금</span>
+  </header>
+
+  <div class="gauge">
+    <div class="top">
+      <span class="k">종합 시스템 리스크</span>
+      <span class="verdict" id="verdict"><span class="em">☮️</span><span id="verdictTxt">–</span></span>
+    </div>
+    <div class="spectrum"><div class="marker" id="marker" style="left:10%"><div class="needle"></div><div class="lbl" id="markerLbl">–</div></div></div>
+    <div class="ends">
+      <span class="pe"><span class="em">☮️</span> 평온 · 신용 안정 · capex 정당화</span>
+      <span class="sk">조달 경색 · HBM 전이 위험 <span class="em">💀</span></span>
+    </div>
+  </div>
+
+  <div class="mods">
+    <div class="mod">
+      <div class="head">
+        <div class="title">① 빅테크 신용 괴리 <span>BBB − AA OAS · bp</span></div>
+        <div class="desc">투자등급 BBB(부채형, Oracle 등급) − AA(현금형, Microsoft 등급) 스프레드 차. FRED 무료 프록시.</div>
+        <span class="dirtag" style="color:var(--red)"><span class="em">▲</span> 확대 = <span class="em">💀</span> 위험</span>
+      </div>
+      <div class="body">
+        <div class="now"><div class="bignum" id="cdsBig">–<small>bp</small></div><div id="cdsPill"></div></div>
+        <div class="sub2"><span>BBB <b id="cdsBBB">–</b></span><span>AA <b id="cdsAA">–</b></span><span id="cdsDlt"></span></div>
+        <svg id="cdsChart" viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet"></svg>
+        <details><summary>관측 로그 / 임계값</summary>
+          <table><thead><tr><th>일자</th><th>BBB</th><th>AA</th><th>차(bp)</th></tr></thead><tbody id="cdsBody"></tbody></table>
+          <div class="hint">임계[추론·조정가능]: 정상&lt;70 · 경계 70–110 · 스트레스 110–160 · 위험&gt;160 bp.<br>※ Oracle 단독이 아니라 BBB 등급 평균이라 단독 이벤트는 희석돼 나타납니다.</div>
+        </details>
+      </div>
+    </div>
+
+    <div class="mod">
+      <div class="head">
+        <div class="title">② 말단 붕괴 위험 <span>neocloud ÷ S&amp;P500 RS</span></div>
+        <div class="desc">CRWV·NBIS·APLD 동일가중 바스켓의 S&amp;P500 대비 상대강도(첫 관측=100). Stooq.</div>
+        <span class="dirtag" style="color:var(--red)"><span class="em">▼</span> 하락 = <span class="em">💀</span> 위험</span>
+      </div>
+      <div class="body">
+        <div class="now"><div class="bignum" id="rsBig">–</div><div id="rsPill"></div></div>
+        <div class="sub2"><span id="rsBase">기준일 = 100</span><span id="rsDlt"></span></div>
+        <svg id="rsChart" viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet"></svg>
+        <details><summary>관측 로그 / 임계값</summary>
+          <table><thead><tr><th>일자</th><th>바스켓idx</th><th>SPXidx</th><th>RS</th></tr></thead><tbody id="rsBody"></tbody></table>
+          <div class="hint">임계[추론]: 안전&gt;100 · 정상 90–100 · 경계 75–90 · 스트레스 60–75 · 위험&lt;60.</div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="emptyBox"></div>
+
+  <footer>
+    <span class="em">💀</span> 두 신호가 <b style="color:var(--ink)">동시</b>에 악화(① 확대 &amp; ② 하락)하면 게이지가 우측으로 — capex→Nvidia→HBM→한국 전이의 조기경보.
+    데이터: FRED(BAMLC0A4CBBB, BAMLC0A2CAA) · Stooq(crwv/nbis/apld/^spx) · GitHub Actions 월·수·금 자동 갱신. 종합 = ①·② 동일가중 추론치.
+  </footer>
+</div>
+
+<script>
+const CSS=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let series=[];
+
+function cdsCol(d){return d<70?CSS('--green'):d<110?CSS('--amber'):d<160?CSS('--orange'):CSS('--red');}
+function cdsStat(d){return d<70?'정상':d<110?'경계':d<160?'스트레스':'위험';}
+function rsCol(v){return v>=90?CSS('--green'):v>=75?CSS('--amber'):v>=60?CSS('--orange'):CSS('--red');}
+function rsStat(v){return v>=100?'안전':v>=90?'정상':v>=75?'경계':v>=60?'스트레스':'위험';}
+const diffBp=r=>(r.bbb_oas-r.aa_oas)*100;
+function basketIdx(r,b){const ks=['crwv','nbis','apld'],v=[];ks.forEach(k=>{if(r[k]>0&&b[k]>0)v.push(r[k]/b[k]);});return v.length?v.reduce((a,c)=>a+c,0)/v.length*100:100;}
+const spxIdx=(r,b)=>b.spx>0?r.spx/b.spx*100:100;
+const rsVal=(r,b)=>{const s=spxIdx(r,b);return s>0?basketIdx(r,b)/s*100:100;};
+function cdsRisk(d){if(d<70)return 8+d/70*12;if(d<110)return 20+(d-70)/40*30;if(d<160)return 50+(d-110)/50*30;return Math.min(96,80+(d-160)*0.15);}
+function rsRisk(v){if(v>=100)return Math.max(6,18-(v-100)*0.3);if(v>=90)return 18+(100-v)/10*22;if(v>=75)return 40+(90-v)/15*25;if(v>=60)return 65+(75-v)/15*20;return Math.min(96,85+(60-v)*0.4);}
+
+function chart(id,vals,dates,bands,unit,min,max){
+  const svg=document.getElementById(id);const W=460,H=150,pl=30,pr=10,pt=10,pb=20;svg.innerHTML='';if(!vals.length)return;
+  const x=i=>pl+(W-pl-pr)*(vals.length===1?0.5:i/(vals.length-1));
+  const y=v=>pt+(H-pt-pb)*(1-(v-min)/(max-min));
+  bands.forEach(([a,b,c])=>{const yy=y(Math.min(b,max)),hh=y(Math.max(a,min))-y(Math.min(b,max));if(hh<=0)return;
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('x',pl);r.setAttribute('y',yy);
+    r.setAttribute('width',W-pl-pr);r.setAttribute('height',hh);r.setAttribute('fill',CSS(c));r.setAttribute('opacity','.08');svg.appendChild(r);});
+  for(let t=0;t<=4;t++){const v=min+(max-min)*t/4;const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',pl);ln.setAttribute('x2',W-pr);ln.setAttribute('y1',y(v));ln.setAttribute('y2',y(v));ln.setAttribute('class','gl');ln.setAttribute('opacity','.5');svg.appendChild(ln);
+    const tx=document.createElementNS('http://www.w3.org/2000/svg','text');tx.setAttribute('x',pl-5);tx.setAttribute('y',y(v)+3);tx.setAttribute('text-anchor','end');tx.setAttribute('class','axt');tx.textContent=Math.round(v)+unit;svg.appendChild(tx);}
+  const col=CSS('--accent');
+  if(vals.length>1){let d='M'+x(0)+','+y(vals[0]);for(let i=1;i<vals.length;i++)d+=' L'+x(i)+','+y(vals[i]);
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);p.setAttribute('class','ln');p.setAttribute('stroke',col);svg.appendChild(p);}
+  vals.forEach((v,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',x(i));c.setAttribute('cy',y(v));c.setAttribute('r',3.2);c.setAttribute('class','dt');c.setAttribute('stroke',col);svg.appendChild(c);
+    if(i===0||i===vals.length-1||vals.length<=5){const tx=document.createElementNS('http://www.w3.org/2000/svg','text');tx.setAttribute('x',x(i));tx.setAttribute('y',H-6);tx.setAttribute('text-anchor','middle');tx.setAttribute('class','axt');tx.textContent=dates[i].slice(2);svg.appendChild(tx);}});
+}
+
+function render(){
+  if(!series.length){document.getElementById('emptyBox').innerHTML=
+    '<div class="empty">데이터 수집 대기 — GitHub Actions의 <b style="color:var(--accent)">Run workflow</b>를 한 번 실행하면<br>월·수·금 자동으로 채워집니다. (data.json 생성)</div>';return;}
+  const base=series[0],last=series[series.length-1],prev=series.length>1?series[series.length-2]:null;
+  document.getElementById('updated').innerHTML='마지막 갱신 <b>'+last.date+'</b> · 자동 월·수·금';
+
+  // ① CDS proxy
+  const dl=diffBp(last);
+  const cb=document.getElementById('cdsBig');cb.innerHTML=dl.toFixed(0)+'<small>bp</small>';cb.style.color=cdsCol(dl);
+  document.getElementById('cdsPill').innerHTML='<span class="statuspill" style="color:'+cdsCol(dl)+'"><span class="dot"></span>'+cdsStat(dl)+'</span>';
+  document.getElementById('cdsBBB').textContent=(last.bbb_oas*100).toFixed(0)+'bp';
+  document.getElementById('cdsAA').textContent=(last.aa_oas*100).toFixed(0)+'bp';
+  if(prev){const ch=dl-diffBp(prev);const el=document.getElementById('cdsDlt');el.style.color=ch>=0?CSS('--orange'):CSS('--green');el.innerHTML='괴리 '+(ch>=0?'▲':'▼')+Math.abs(ch).toFixed(0)+'bp';}
+  const cdsVals=series.map(diffBp);
+  chart('cdsChart',cdsVals,series.map(r=>r.date),[[0,70,'--green'],[70,110,'--amber'],[110,160,'--orange'],[160,300,'--red']],'',0,Math.max(180,Math.ceil(Math.max(...cdsVals)/20)*20+20));
+  const cbody=document.getElementById('cdsBody');cbody.innerHTML='';
+  series.slice().reverse().forEach(r=>{const d=diffBp(r);cbody.insertAdjacentHTML('beforeend',
+    '<tr><td>'+r.date+'</td><td>'+(r.bbb_oas*100).toFixed(0)+'</td><td>'+(r.aa_oas*100).toFixed(0)+'</td><td style="color:'+cdsCol(d)+';font-weight:700">'+d.toFixed(0)+'</td></tr>');});
+
+  // ② RS
+  const rv=rsVal(last,base);
+  const rb=document.getElementById('rsBig');rb.textContent=rv.toFixed(1);rb.style.color=rsCol(rv);
+  document.getElementById('rsPill').innerHTML='<span class="statuspill" style="color:'+rsCol(rv)+'"><span class="dot"></span>'+rsStat(rv)+'</span>';
+  document.getElementById('rsBase').textContent='기준일 '+base.date+' = 100';
+  if(prev){const ch=rv-rsVal(prev,base);const el=document.getElementById('rsDlt');el.style.color=ch<=0?CSS('--orange'):CSS('--green');el.innerHTML='RS '+(ch<=0?'▼':'▲')+Math.abs(ch).toFixed(1);}
+  const rsVals=series.map(r=>rsVal(r,base));
+  chart('rsChart',rsVals,series.map(r=>r.date),[[90,160,'--green'],[75,90,'--amber'],[60,75,'--orange'],[0,60,'--red']],'',Math.min(55,Math.floor(Math.min(...rsVals)/10)*10),Math.max(105,Math.ceil(Math.max(...rsVals)/10)*10));
+  const rbody=document.getElementById('rsBody');rbody.innerHTML='';
+  series.slice().reverse().forEach(r=>{const v=rsVal(r,base);rbody.insertAdjacentHTML('beforeend',
+    '<tr><td>'+r.date+'</td><td>'+basketIdx(r,base).toFixed(1)+'</td><td>'+spxIdx(r,base).toFixed(1)+'</td><td style="color:'+rsCol(v)+';font-weight:700">'+v.toFixed(1)+'</td></tr>');});
+
+  // composite gauge
+  const comp=(cdsRisk(dl)+rsRisk(rv))/2;
+  document.getElementById('marker').style.left=Math.max(3,Math.min(97,comp))+'%';
+  document.getElementById('markerLbl').textContent=Math.round(comp);
+  let em,txt,col;
+  if(comp<25){em='☮️';txt='평온';col=CSS('--green');}
+  else if(comp<50){em='🙂';txt='주의';col=CSS('--amber');}
+  else if(comp<75){em='⚠️';txt='경계';col=CSS('--orange');}
+  else{em='💀';txt='위험';col=CSS('--red');}
+  document.getElementById('verdict').innerHTML='<span class="em">'+em+'</span><span style="color:'+col+'">'+txt+' · '+Math.round(comp)+'/100</span>';
+}
+
+(async function(){
+  try{
+    const res=await fetch('./data.json?t='+Date.now());
+    const j=await res.json();
+    series=(j.series||[]).filter(r=>r.spx>0).sort((a,b)=>a.date.localeCompare(b.date));
+  }catch(e){series=[];}
+  render();
+})();
+</script>
+</body>
+</html>
